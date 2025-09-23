@@ -15,7 +15,7 @@ export default function Navbar() {
   return (
     <nav className="bg-white dark:bg-gray-900 shadow px-6 py-4 flex justify-between items-center">
       <div className="flex gap-6">
-        <Link href="/" className="font-bold text-xl">FPL_genius</Link>
+        <Link href="/" className="font-bold text-xl">MyFPL-Genius</Link>
         <Link href="/players">Players</Link>
         <Link href="/teams">Teams</Link>
       </div>

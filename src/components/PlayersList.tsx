@@ -14,7 +14,9 @@ type Player = {
 
 export default function PlayersList({ players, teams }: { players: Player[]; teams: any[] }) {
   const [search, setSearch] = useState("");
-  const [filter, setFilter] = useState("all");
+  const [positionFilter, setPositionFilter] = useState("all");
+  const [teamFilter, setTeamFilter] = useState("all");
+  const [sortBy, setSortBy] = useState("points");
 
   const getPosition = (type: number) => {
     switch (type) {
@@ -31,18 +33,30 @@ export default function PlayersList({ players, teams }: { players: Player[]; tea
     }
   };
 
-  const filteredPlayers = players.filter((player) => {
-    const matchesSearch = player.web_name.toLowerCase().includes(search.toLowerCase());
-    const matchesFilter = filter === "all" || player.element_type === Number(filter);
-    return matchesSearch && matchesFilter;
-  });
+  const filteredPlayers = players
+    .filter((player) => {
+      const matchesSearch = player.web_name.toLowerCase().includes(search.toLowerCase());
+      const matchesPosition = positionFilter === "all" || player.element_type === Number(positionFilter);
+      const matchesTeam = teamFilter === "all" || player.team === Number(teamFilter);
+      return matchesSearch && matchesPosition && matchesTeam;
+    })
+    .sort((a, b) => {
+      if (sortBy === "price") {
+        return b.now_cost - a.now_cost;
+      } else if (sortBy === "points") {
+        return b.total_points - a.total_points;
+      } else {
+        return a.web_name.localeCompare(b.web_name);
+      }
+    });
 
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6">Players</h1>
 
-      {/* 🔍 Search + Filter */}
+      {/* 🔍 Search + Filters + Sort */}
       <div className="flex flex-col md:flex-row gap-4 mb-6">
+        {/* Search */}
         <input
           type="text"
           placeholder="Search player..."
@@ -50,9 +64,11 @@ export default function PlayersList({ players, teams }: { players: Player[]; tea
           onChange={(e) => setSearch(e.target.value)}
           className="px-4 py-2 border rounded-lg flex-1"
         />
+
+        {/* Position Filter */}
         <select
-          value={filter}
-          onChange={(e) => setFilter(e.target.value)}
+          value={positionFilter}
+          onChange={(e) => setPositionFilter(e.target.value)}
           className="px-4 py-2 border rounded-lg"
         >
           <option value="all">All Positions</option>
@@ -60,6 +76,31 @@ export default function PlayersList({ players, teams }: { players: Player[]; tea
           <option value="2">Defenders</option>
           <option value="3">Midfielders</option>
           <option value="4">Forwards</option>
+        </select>
+
+        {/* Team Filter */}
+        <select
+          value={teamFilter}
+          onChange={(e) => setTeamFilter(e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="all">All Teams</option>
+          {teams.map((team) => (
+            <option key={team.id} value={team.id}>
+              {team.name}
+            </option>
+          ))}
+        </select>
+
+        {/* Sort Dropdown */}
+        <select
+          value={sortBy}
+          onChange={(e) => setSortBy(e.target.value)}
+          className="px-4 py-2 border rounded-lg"
+        >
+          <option value="points">Sort by Points</option>
+          <option value="price">Sort by Price</option>
+          <option value="name">Sort by Name</option>
         </select>
       </div>
 
