@@ -106,7 +106,7 @@ export default function PlayersList({ players, teams }: { players: Player[]; tea
 
       {/* Player Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredPlayers.slice(0, 30).map((player) => {
+        {filteredPlayers.slice(0, 60).map((player) => {
           const team = teams.find((t: any) => t.id === player.team);
           return (
             <div
