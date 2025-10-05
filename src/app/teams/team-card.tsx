@@ -8,7 +8,6 @@ export default function TeamCard({ team }: { team: any }) {
 
   return (
     <div className="p-6 bg-white dark:bg-gray-800 rounded-xl shadow-md hover:shadow-lg transition">
-      {/* Team Logo */}
       <div className="flex items-center gap-4 mb-4">
         {!imgError ? (
           <img
@@ -28,7 +27,6 @@ export default function TeamCard({ team }: { team: any }) {
         </div>
       </div>
 
-      {/* Extra Stats */}
       <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
         <p>
           <span className="font-medium">Overall Strength:</span> {team.strength}
@@ -43,7 +41,6 @@ export default function TeamCard({ team }: { team: any }) {
         </p>
       </div>
 
-      {/* Link */}
       <Link
         href={`/teams/${team.id}`}
         className="mt-4 inline-block text-blue-600 dark:text-blue-400 hover:underline"
