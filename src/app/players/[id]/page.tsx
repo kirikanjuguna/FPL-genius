@@ -32,7 +32,7 @@ interface FPLResponse {
 
 async function getPlayerData(id: string) {
   const res = await fetch("https://fantasy.premierleague.com/api/bootstrap-static/", {
-    next: { revalidate: 3600 },
+    cache: "no-store", // ✅ prevent oversized data cache error
   });
 
   if (!res.ok) throw new Error("Failed to fetch data");
@@ -47,7 +47,8 @@ async function getPlayerData(id: string) {
   return { player, team, position };
 }
 
-export default async function PlayerDetailsPage({ params }: { params: { id: string } }) {
+export default async function PlayerDetailsPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params; // ✅ await params before using
   const playerData = await getPlayerData(params.id);
 
   if (!playerData) notFound();

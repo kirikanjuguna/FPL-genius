@@ -1,8 +1,11 @@
-// src/app/teams/[id]/page.tsx
 import Link from "next/link";
 
-export default async function TeamDetailPage({ params }: { params: { id: string } }) {
-  const res = await fetch("https://fantasy.premierleague.com/api/bootstrap-static/");
+export default async function TeamDetailPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params; // ✅ await before use
+  const res = await fetch("https://fantasy.premierleague.com/api/bootstrap-static/", {
+    cache: "no-store", // ✅ prevent cache error
+  });
+
   const data = await res.json();
 
   const team = data.teams.find((t: any) => t.id === Number(params.id));
@@ -50,12 +53,8 @@ export default async function TeamDetailPage({ params }: { params: { id: string 
         />
         <div>
           <h1 className="text-3xl font-bold">{team.name}</h1>
-          <p className="text-gray-600 dark:text-gray-300">
-            Short: {team.short_name}
-          </p>
-          <p className="text-gray-600 dark:text-gray-300">
-            Strength: {team.strength}
-          </p>
+          <p className="text-gray-600 dark:text-gray-300">Short: {team.short_name}</p>
+          <p className="text-gray-600 dark:text-gray-300">Strength: {team.strength}</p>
         </div>
       </div>
 
