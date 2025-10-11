@@ -6,6 +6,10 @@ export default async function PlayersPage() {
     next: { revalidate: 60 },
   });
 
+  if (!res.ok) {
+    throw new Error("Failed to fetch player data");
+  }
+
   const data = await res.json();
   return <PlayersList players={data.elements} teams={data.teams} />;
 }
