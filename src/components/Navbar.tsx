@@ -18,6 +18,7 @@ export default function Navbar() {
         <Link href="/" className="font-bold text-xl">MyFPL-Genius</Link>
         <Link href="/players">Players</Link>
         <Link href="/teams">Teams</Link>
+        <Link href="/fixtures">Fixtures</Link>
       </div>
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
