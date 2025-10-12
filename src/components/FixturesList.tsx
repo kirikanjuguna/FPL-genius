@@ -43,6 +43,16 @@ export default function FixturesList({ fixtures, teams }: FixturesListProps) {
   const getTeamName = (id: number) =>
     teams.find((t) => t.id === id)?.short_name || "Unknown";
 
+  // ✅ Safe date formatting (same result on server & client)
+  const formatKickoffTime = (kickoff: string | null) => {
+    if (!kickoff) return "TBD";
+    try {
+      return new Date(kickoff).toISOString().replace("T", " ").slice(0, 16);
+    } catch {
+      return "TBD";
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto p-6">
       <h1 className="text-3xl font-bold text-center mb-6">FPL Fixtures</h1>
@@ -90,9 +100,7 @@ export default function FixturesList({ fixtures, teams }: FixturesListProps) {
                       </p>
                     ) : (
                       <p className="text-gray-500 text-sm">
-                        {fixture.kickoff_time
-                          ? new Date(fixture.kickoff_time).toLocaleString()
-                          : "TBD"}
+                        {formatKickoffTime(fixture.kickoff_time)}
                       </p>
                     )}
                   </div>
