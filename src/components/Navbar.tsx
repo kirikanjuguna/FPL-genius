@@ -19,6 +19,7 @@ export default function Navbar() {
         <Link href="/players">Players</Link>
         <Link href="/teams">Teams</Link>
         <Link href="/fixtures">Fixtures</Link>
+        <Link href="/gameweeks">Gameweeks</Link>
       </div>
       <button
         onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
