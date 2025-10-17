@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 
 interface Event {
   id: number;
@@ -24,23 +24,6 @@ interface Team {
   name: string;
 }
 
-interface Fixture {
-  id: number;
-  team_h: number;
-  team_a: number;
-  kickoff_time: string | null;
-  finished: boolean;
-  team_h_score: number | null;
-  team_a_score: number | null;
-}
-
-interface LiveElement {
-  element: number; // player id
-  stats: {
-    total_points: number;
-  };
-}
-
 interface GameweeksListProps {
   events: Event[];
   players: Player[];
@@ -49,82 +32,80 @@ interface GameweeksListProps {
 
 export default function GameweeksList({ events, players, teams }: GameweeksListProps) {
   const [selectedGW, setSelectedGW] = useState<Event | null>(
-    events.find((e) => e.is_current) || events[0] || null
+    events.find((e) => e.is_current) || null
   );
-  const [fixtures, setFixtures] = useState<Fixture[]>([]);
-  const [topScorers, setTopScorers] = useState<
-    { id: number; web_name: string; teamName: string; points: number }[]
-  >([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [fixtures, setFixtures] = useState<any[]>([]);
+  const [topPlayers, setTopPlayers] = useState<any[]>([]);
+  const [loadingFixtures, setLoadingFixtures] = useState(false);
+  const [loadingPlayers, setLoadingPlayers] = useState(false);
 
-  const getTeamName = (id: number) => teams.find((t) => t.id === id)?.name || "Unknown";
-
-  // When selectedGW changes, fetch fixtures and live/top data
+  // ✅ Fetch Fixtures for selected gameweek
   useEffect(() => {
     if (!selectedGW) return;
-    setLoading(true);
-    setError(null);
 
-    // fetch fixtures for that GW
-    const fetchGWFixtures = async () => {
+    const loadFixtures = async () => {
       try {
-        const res = await fetch(
-          `https://fantasy.premierleague.com/api/fixtures/?event=${selectedGW.id}`
-        );
-        if (!res.ok) throw new Error("Failed to fetch GW fixtures");
-        const fx: Fixture[] = await res.json();
-        setFixtures(fx);
-      } catch (err: any) {
-        console.error("Error fetching fixtures:", err);
-        setError("Could not load fixtures for this gameweek");
+        setLoadingFixtures(true);
+        const res = await fetch(`https://fantasy.premierleague.com/api/fixtures/?event=${selectedGW.id}`);
+        let data = await res.json();
+
+        // fallback if API returns empty
+        if (!Array.isArray(data) || data.length === 0) {
+          const allRes = await fetch("https://fantasy.premierleague.com/api/fixtures/");
+          const allData = await allRes.json();
+          data = allData.filter((f: any) => f.event === selectedGW.id);
+        }
+
+        setFixtures(data);
+      } catch (err) {
+        console.error("Could not load fixtures:", err);
         setFixtures([]);
+      } finally {
+        setLoadingFixtures(false);
       }
     };
 
-    // fetch live/top data
-    const fetchTopScorers = async () => {
+    loadFixtures();
+  }, [selectedGW]);
+
+  // ✅ Fetch top players per gameweek
+  useEffect(() => {
+    if (!selectedGW) return;
+
+    const loadTopPlayers = async () => {
       try {
-        const res = await fetch(
-          `https://fantasy.premierleague.com/api/event/${selectedGW.id}/live/`
-        );
-        if (!res.ok) throw new Error("Failed to fetch live GW data");
+        setLoadingPlayers(true);
+        const res = await fetch(`https://fantasy.premierleague.com/api/event/${selectedGW.id}/live/`);
+        if (!res.ok) throw new Error("Failed to load event live data");
         const data = await res.json();
-        const elements: LiveElement[] = data.elements;
 
-        // sort by total_points descending
+        const elements = data.elements || [];
+
+        // sort players by total GW points (descending)
         const sorted = elements
-          .map((el) => ({
-            id: el.element,
-            points: el.stats.total_points,
-          }))
-          .sort((a, b) => b.points - a.points)
-          .slice(0, 5);
+          .sort((a: any, b: any) => b.stats.total_points - a.stats.total_points)
+          .slice(0, 5)
+          .map((e: any) => {
+            const p = players.find((p) => p.id === e.id);
+            const team = teams.find((t) => t.id === p?.team);
+            return {
+              id: e.id,
+              name: p?.web_name || "Unknown",
+              teamName: team?.name || "Unknown",
+              points: e.stats.total_points,
+            };
+          });
 
-        const enriched = sorted.map((e) => ({
-          id: e.id,
-          points: e.points,
-          web_name: players.find((p) => p.id === e.id)?.web_name || "Unknown",
-          teamName:
-            teams.find((t) => t.id === players.find((p) => p.id === e.id)?.team)?.name ||
-            "Unknown",
-        }));
-
-        setTopScorers(enriched);
-      } catch (err: any) {
-        console.error("Error fetching live data:", err);
-        // it’s okay if live fails, we can fallback
-        setTopScorers([]);
+        setTopPlayers(sorted);
+      } catch (err) {
+        console.error("Could not load top players:", err);
+        setTopPlayers([]);
+      } finally {
+        setLoadingPlayers(false);
       }
     };
 
-    Promise.all([fetchGWFixtures(), fetchTopScorers()])
-      .catch((e) => {
-        console.error("GW data error:", e);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    loadTopPlayers();
   }, [selectedGW, players, teams]);
 
   return (
@@ -137,43 +118,36 @@ export default function GameweeksList({ events, players, teams }: GameweeksListP
           <button
             key={event.id}
             onClick={() => setSelectedGW(event)}
-            className={`relative px-4 py-2 rounded-lg text-white transition ${
+            className={`px-4 py-2 rounded-lg text-white transition ${
               selectedGW?.id === event.id
-                ? "bg-blue-600 ring-2 ring-blue-300"
+                ? "bg-blue-600"
                 : event.finished
                 ? "bg-gray-600 hover:bg-gray-700"
                 : "bg-green-600 hover:bg-green-700"
             }`}
           >
             {event.name}
-            {event.is_current && (
-              <span className="absolute -top-2 -right-2 bg-yellow-400 text-xs px-2 py-1 rounded-full text-black font-semibold">
-                LIVE
-              </span>
-            )}
           </button>
         ))}
       </div>
 
-      {/* Gameweek Info */}
+      {/* Selected Gameweek Info */}
       {selectedGW && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-10">
           <h2 className="text-2xl font-semibold mb-2">{selectedGW.name}</h2>
-          <p className="text-gray-600 dark:text-gray-300 mb-2">
-            Deadline: {new Date(selectedGW.deadline_time).toLocaleString()}
-          </p>
-          <p className="text-gray-600 dark:text-gray-300 mb-4">
+          <ClientDateFormatter isoDate={selectedGW.deadline_time} />
+          <p className="text-gray-600 dark:text-gray-300">
             {selectedGW.finished ? "✅ Completed" : "🕒 Ongoing or Upcoming"}
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6">
             <InfoCard title="Average Points" value={selectedGW.average_entry_score} />
             <InfoCard title="Highest Points" value={selectedGW.highest_score} />
             <InfoCard
               title="Status"
               value={
                 selectedGW.is_current
-                  ? "Current GW"
+                  ? "Current Gameweek"
                   : selectedGW.finished
                   ? "Finished"
                   : "Upcoming"
@@ -184,79 +158,79 @@ export default function GameweeksList({ events, players, teams }: GameweeksListP
       )}
 
       {/* Fixtures */}
-      <div className="mb-10">
+      <section className="mb-10">
         <h2 className="text-2xl font-semibold mb-4">Fixtures</h2>
-        {loading ? (
+        {loadingFixtures ? (
           <p>Loading fixtures...</p>
-        ) : error ? (
-          <p className="text-red-600">{error}</p>
-        ) : fixtures.length === 0 ? (
-          <p>No fixtures for this gameweek.</p>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow divide-y">
-            {fixtures.map((fixture) => (
-              <div
-                key={fixture.id}
-                className="flex justify-between items-center p-4"
-              >
-                <div className="flex-1 text-right">
-                  <p className="font-medium">{getTeamName(fixture.team_h)}</p>
-                </div>
-                <div className="w-32 text-center">
-                  {fixture.finished ? (
-                    <p className="text-lg font-bold">
-                      {fixture.team_h_score} - {fixture.team_a_score}
-                    </p>
-                  ) : fixture.kickoff_time ? (
-                    <p className="text-gray-500 text-sm">
-                      {new Date(fixture.kickoff_time).toLocaleString()}
-                    </p>
-                  ) : (
-                    <p>TBD</p>
-                  )}
-                </div>
-                <div className="flex-1 text-left">
-                  <p className="font-medium">{getTeamName(fixture.team_a)}</p>
-                </div>
-              </div>
+        ) : fixtures.length > 0 ? (
+          <ul className="space-y-2">
+            {fixtures.map((f) => (
+              <li key={f.id} className="bg-gray-50 dark:bg-gray-700 rounded-md p-3 shadow-sm">
+                {teams.find((t) => t.id === f.team_h)?.name} vs{" "}
+                {teams.find((t) => t.id === f.team_a)?.name}
+              </li>
             ))}
-          </div>
-        )}
-      </div>
-
-      {/* Top Scorers */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-4">Top Players This GW</h2>
-        {loading ? (
-          <p>Loading top players...</p>
-        ) : topScorers.length === 0 ? (
-          <p>No stats available for this week.</p>
+          </ul>
         ) : (
+          <p className="text-gray-500">No fixtures for this gameweek.</p>
+        )}
+      </section>
+
+      {/* Top Players for this GW */}
+      <section>
+        <h2 className="text-2xl font-semibold mb-4">Top Players This GW</h2>
+        {loadingPlayers ? (
+          <p>Loading player stats...</p>
+        ) : topPlayers.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {topScorers.map((p) => (
+            {topPlayers.map((p) => (
               <div
                 key={p.id}
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 hover:shadow-lg transition"
               >
-                <h3 className="font-semibold text-lg mb-1">{p.web_name}</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-1">
-                  {p.teamName}
-                </p>
-                <p className="font-medium">GW Points: {p.points}</p>
+                <h3 className="font-semibold text-lg mb-1">{p.name}</h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-1">{p.teamName}</p>
+                <p className="font-medium">Points: {p.points}</p>
               </div>
             ))}
           </div>
+        ) : (
+          <p className="text-gray-500">No stats available for this week.</p>
         )}
-      </div>
+      </section>
     </div>
   );
 }
 
+// Small subcomponents
 function InfoCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
       <h3 className="font-semibold text-gray-700 dark:text-gray-200">{title}</h3>
       <p className="text-lg font-medium">{value}</p>
     </div>
+  );
+}
+
+function ClientDateFormatter({ isoDate }: { isoDate: string }) {
+  const [formatted, setFormatted] = useState("");
+
+  useEffect(() => {
+    const date = new Date(isoDate);
+    setFormatted(
+      date.toLocaleString("en-GB", {
+        weekday: "short",
+        day: "numeric",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    );
+  }, [isoDate]);
+
+  return (
+    <p className="text-gray-600 dark:text-gray-300 mb-2">
+      Deadline: {formatted || "Loading date..."}
+    </p>
   );
 }
