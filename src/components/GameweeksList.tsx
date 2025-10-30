@@ -52,20 +52,25 @@ interface TopPlayer {
   points: number;
 }
 
-export default function GameweeksList({ events, players, teams, fixtures }: GameweeksListProps) {
+export default function GameweeksList({
+  events,
+  players,
+  teams,
+  fixtures,
+}: GameweeksListProps) {
   const [selectedGW, setSelectedGW] = useState<Event | null>(
     events.find((e) => e.is_current) || events[0] || null
   );
   const [topPlayers, setTopPlayers] = useState<TopPlayer[]>([]);
   const [loadingPlayers, setLoadingPlayers] = useState(false);
 
-  // ✅ Get fixtures for selected GW (from props)
+  // ✅ Filter fixtures for selected GW
   const currentFixtures = useMemo(() => {
     if (!selectedGW) return [];
     return fixtures.filter((f: Fixture) => f.event === selectedGW.id);
   }, [fixtures, selectedGW]);
 
-  // ✅ Fetch top players dynamically for selected GW
+  // ✅ Fetch top players (combining bootstrap + live data)
   useEffect(() => {
     if (!selectedGW) return;
 
@@ -73,35 +78,46 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
       try {
         setLoadingPlayers(true);
 
-        // Fetch live GW data
-        const res = await fetch(`https://fantasy.premierleague.com/api/event/${selectedGW.id}/live/`);
-        if (!res.ok) throw new Error("Failed to load event live data");
+        // Fetch both bootstrap (for player info) and live data (for scores)
+        const [bootstrapRes, liveRes] = await Promise.all([
+          fetch("https://fantasy.premierleague.com/api/bootstrap-static/"),
+          fetch(`https://fantasy.premierleague.com/api/event/${selectedGW.id}/live/`),
+        ]);
 
-        const data = await res.json();
-        const elements = data.elements || [];
+        if (!bootstrapRes.ok || !liveRes.ok)
+          throw new Error("Failed to load FPL data");
 
-        // ✅ Combine live points with static player info
-        const mergedPlayers: TopPlayer[] = elements
-          .map((e: any) => {
-            const base = players.find((p: Player) => p.id === e.id);
-            const team = teams.find((t: Team) => t.id === base?.team);
+        const [bootstrapData, liveData] = await Promise.all([
+          bootstrapRes.json(),
+          liveRes.json(),
+        ]);
 
+        const playersData = bootstrapData.elements || [];
+        const teamsData = bootstrapData.teams || [];
+        const liveElements = liveData.elements || [];
+
+        // Merge player info + live points
+        const mergedPlayers: TopPlayer[] = liveElements
+          .map((el: any) => {
+            const playerInfo = playersData.find((p: any) => p.id === el.id || p.id === el.element);
+            if (!playerInfo) return null;
+
+            const team = teamsData.find((t: any) => t.id === playerInfo.team);
             return {
-              id: e.id,
-              name: base
-                ? `${base.first_name || ""} ${base.second_name || base.web_name}`
-                : "Unknown",
+              id: playerInfo.id,
+              name: `${playerInfo.first_name} ${playerInfo.second_name}`,
               teamName: team?.name || "Unknown",
-              points: e.stats.total_points || 0,
+              points: el.stats.total_points || 0,
             };
           })
+          .filter(Boolean)
           .filter((p: TopPlayer) => p.points > 0)
           .sort((a: TopPlayer, b: TopPlayer) => b.points - a.points)
           .slice(0, 5);
 
         setTopPlayers(mergedPlayers);
-      } catch (err) {
-        console.error("Could not load top players:", err);
+      } catch (error) {
+        console.error("Error loading top players:", error);
         setTopPlayers([]);
       } finally {
         setLoadingPlayers(false);
@@ -109,7 +125,7 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
     };
 
     loadTopPlayers();
-  }, [selectedGW, players, teams]);
+  }, [selectedGW]);
 
   const getTeamName = (id: number) =>
     teams.find((t: Team) => t.id === id)?.short_name || "Unknown";
@@ -132,7 +148,9 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
 
   return (
     <div className="max-w-5xl mx-auto p-6">
-      <h1 className="text-3xl font-bold text-center mb-8">FPL Gameweeks Summary</h1>
+      <h1 className="text-3xl font-bold text-center mb-8">
+        FPL Gameweeks Summary
+      </h1>
 
       {/* Gameweek Selector */}
       <div className="flex flex-wrap justify-center gap-3 mb-8">
@@ -153,7 +171,7 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
         ))}
       </div>
 
-      {/* Selected Gameweek Info */}
+      {/* Gameweek Info */}
       {selectedGW && (
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 mb-10">
           <h2 className="text-2xl font-semibold mb-2">{selectedGW.name}</h2>
@@ -226,7 +244,9 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
                 className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-4 hover:shadow-lg transition"
               >
                 <h3 className="font-semibold text-lg mb-1">{p.name}</h3>
-                <p className="text-gray-600 dark:text-gray-300 mb-1">{p.teamName}</p>
+                <p className="text-gray-600 dark:text-gray-300 mb-1">
+                  {p.teamName}
+                </p>
                 <p className="font-medium">Points: {p.points}</p>
               </div>
             ))}
@@ -239,7 +259,7 @@ export default function GameweeksList({ events, players, teams, fixtures }: Game
   );
 }
 
-// Small reusable UI components
+// Reusable InfoCard
 function InfoCard({ title, value }: { title: string; value: string | number }) {
   return (
     <div className="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg text-center">
@@ -249,6 +269,7 @@ function InfoCard({ title, value }: { title: string; value: string | number }) {
   );
 }
 
+// Client-side deadline formatter
 function ClientDateFormatter({ isoDate }: { isoDate: string }) {
   const [formatted, setFormatted] = useState("");
 
